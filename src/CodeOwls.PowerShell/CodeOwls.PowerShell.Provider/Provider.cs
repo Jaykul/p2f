@@ -27,11 +27,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Provider;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.XPath;
@@ -42,6 +44,7 @@ using CodeOwls.PowerShell.Provider.Attributes;
 using CodeOwls.PowerShell.Provider.PathNodeProcessors;
 using CodeOwls.PowerShell.Provider.PathNodes;
 
+
 namespace CodeOwls.PowerShell.Provider
 {
     //[CmdletProvider("YourProviderName", ProviderCapabilities.ShouldProcess)]
@@ -51,6 +54,8 @@ namespace CodeOwls.PowerShell.Provider
         ICmdletProviderSupportsHelp,
         IContentCmdletProvider
     {
+        private static readonly Dictionary<string, Regex> FilterRegexMap = new Dictionary<string, Regex>(StringComparer.OrdinalIgnoreCase);
+
         internal Drive DefaultDrive
         {
             get
@@ -66,46 +71,44 @@ namespace CodeOwls.PowerShell.Provider
             }
         }
 
- 
         internal Drive GetDriveForPath( string path )
         {
             var name = Drive.GetDriveName(path);
             return (from drive in ProviderInfo.Drives
-                    where StringComparer.InvariantCultureIgnoreCase.Equals(drive.Name, name)
+                    where StringComparer.OrdinalIgnoreCase.Equals(drive.Name, name)
                     select drive).FirstOrDefault() as Drive;
         }
 
         protected abstract IPathResolver PathResolver { get; }
 
+        /// <summary>
+        /// When multiple drives are registered with the same provider and a user 'cd' among them, ProviderInfo.Drives will 
+        /// contains their corresponding dirves. 
+        /// In addition, when a user types "cd FooBarProvider\FooBarProvider::Test\, PSDriveInfo as FooBarProvider can be null.
+        /// Thus the derived class need to get the right drive object from ProviderInfo.Drives based on given path.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        protected virtual IPathResolver PathResolver2(string path)
+        {
+            return null;
+        }
+
         IEnumerable<IPathNode> ResolvePath( string path )
         {
             path = EnsurePathIsRooted(path);
-            return PathResolver.ResolvePath(CreateContext(path), path);
+            var pathResolver = PathResolver ?? PathResolver2(path);
+            return pathResolver != null ? pathResolver.ResolvePath(CreateContext(path), path) : Enumerable.Empty<IPathNode>();
         }
 
-        string NormalizeWhacks( string path )
+        protected string EnsurePathIsRooted(string path)
         {
-            if( null != PSDriveInfo && 
-                !String.IsNullOrEmpty( PSDriveInfo.Root) && 
-                path.StartsWith( PSDriveInfo.Root ) )
-            {
-                var sub = path.Substring(PSDriveInfo.Root.Length);
-                return PSDriveInfo.Root + NormalizeWhacks(sub);
-            }
-
-            return path.Replace("/", "\\");
-        }
-
-        private string EnsurePathIsRooted(string path)
-        {
-            path = NormalizeWhacks(path);
             if (null != PSDriveInfo &&
                 !String.IsNullOrEmpty(PSDriveInfo.Root))
             {
-                var separator = PSDriveInfo.Root.EndsWith("\\") ? String.Empty : "\\";
                 if (!path.StartsWith(PSDriveInfo.Root))
                 {
-                    path = PSDriveInfo.Root + separator + path;
+                    path = Path.Combine(PSDriveInfo.Root, path);
                 }
             }
 
@@ -124,7 +127,7 @@ namespace CodeOwls.PowerShell.Provider
 
         protected virtual IProviderContext CreateContext(string path, bool recurse, bool resolveFinalNodeFilterItems)
         {
-            var context = new ProviderContext(this, path, PSDriveInfo, PathResolver, DynamicParameters,recurse);
+            var context = new ProviderContext(this, path, PSDriveInfo, PathResolver ?? PathResolver2(path), DynamicParameters,recurse);
             context.ResolveFinalNodeFilterItems = resolveFinalNodeFilterItems;
             return context;
         }
@@ -159,7 +162,7 @@ namespace CodeOwls.PowerShell.Provider
                 var propDescs = TypeDescriptor.GetProperties(value);
                 var props = (from PropertyDescriptor prop in propDescs
                              where (providerSpecificPickList.Contains(prop.Name,
-                                                                      StringComparer.InvariantCultureIgnoreCase))
+                                                                      StringComparer.OrdinalIgnoreCase))
                              select prop);
 
                 props.ToList().ForEach(p =>
@@ -199,7 +202,7 @@ namespace CodeOwls.PowerShell.Provider
             var psoDesc = propertyValue.Properties;
             var props = (from PropertyDescriptor prop in propDescs
                          let psod = (from pso in psoDesc
-                                     where StringComparer.InvariantCultureIgnoreCase.Equals(pso.Name, prop.Name)
+                                     where StringComparer.OrdinalIgnoreCase.Equals(pso.Name, prop.Name)
                                      select pso).FirstOrDefault()
                          where null != psod
                          select new {PSProperty = psod, Property = prop});
@@ -265,7 +268,9 @@ namespace CodeOwls.PowerShell.Provider
 
             try
             {
-                document.Load(filename);
+                //XmlDocument.Load(string) is not supported in CoreCRL. Changed it to load from XmlReader.
+                var reader = XmlReader.Create(filename, new XmlReaderSettings());
+                document.Load(reader);
             }
             catch (Exception e)
             {
@@ -300,7 +305,7 @@ namespace CodeOwls.PowerShell.Provider
             var nodeFactoryType = pathNode.GetType();
             var idsFromAttributes =
                 from CmdletHelpPathIDAttribute attr in
-                    nodeFactoryType.GetCustomAttributes(typeof (CmdletHelpPathIDAttribute), true)
+                    nodeFactoryType.GetTypeInfo().GetCustomAttributes(typeof (CmdletHelpPathIDAttribute), true)
                 select attr.ID;
 
             List<string> keys = new List<string>(idsFromAttributes);
@@ -512,7 +517,11 @@ namespace CodeOwls.PowerShell.Provider
 
         private string DoMakePath(string parent, string child)
         {
-            var newPath = NormalizeWhacks(base.MakePath(parent, child));
+            //trim the end slash for the consistent experience to other built-in providers such as FileSystem.
+            //Show: drive:\A\B\C>
+            //Not:  drive:\A\B\C\>
+            var newChild = child.TrimEnd('/', '\\');     
+            var newPath = base.MakePath(parent, newChild);
             return newPath;
         }
 
@@ -529,13 +538,14 @@ namespace CodeOwls.PowerShell.Provider
                 return path;
             }
 
-            path = NormalizeWhacks(base.GetParentPath(path, root));
+            path = base.GetParentPath(path, root);
             return path;
         }
 
         protected override string NormalizeRelativePath(string path, string basePath)
         {
-            Func<string> a = () => NormalizeWhacks(base.NormalizeRelativePath(path, basePath));
+
+            Func<string> a = () => base.NormalizeRelativePath(path, basePath);
             return ExecuteAndLog(a, "NormalizeRelativePath", path, basePath);
         }
 
@@ -547,12 +557,10 @@ namespace CodeOwls.PowerShell.Provider
 
         private string DoGetChildName(string path)
         {
-            path = NormalizeWhacks(path);
-            return path.Split('\\').Last();
+            return path.Split(Path.DirectorySeparatorChar).Last();
         }
 
-
-        void GetItem( string path, IPathNode factory )
+        protected void GetItem( string path, IPathNode factory )
         {
             try
             {
@@ -578,6 +586,7 @@ namespace CodeOwls.PowerShell.Provider
             }
 
             factories.ToList().ForEach(f => GetItem(path, f));
+            FilterRegexMap.Clear();
         }
 
         void SetItem( string path, IPathNode factory, object value )
@@ -810,22 +819,30 @@ namespace CodeOwls.PowerShell.Provider
             {
                 return true;
             }
-
-            return null != GetNodeFactoryFromPath(path);
+            // item does not exist if the path is null or empty
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+            var nodes = GetNodeFactoryFromPathForItemExists(path);
+            return ((null != nodes) && nodes.Any()) ;
         }
-
+        protected virtual IEnumerable<IPathNode> GetNodeFactoryFromPathForItemExists(string path)
+        {
+            return GetNodeFactoryFromPath(path);
+        }
         protected override bool IsValidPath(string path)
         {
             return ExecuteAndLog(() => true, "IsValidPath", path);
         }
 
-        protected override void GetChildItems( string path, bool recurse )
+        protected override void GetChildItems( string path, bool recurse, uint depth)
         {
-            Action a= ()=>DoGetChildItems(path, recurse);
+            Action a= ()=>DoGetChildItems(path, recurse, depth);
             ExecuteAndLog(a, "GetChildItems", path, recurse.ToString());
         }
 
-        private void DoGetChildItems(string path, bool recurse)
+        private void DoGetChildItems(string path, bool recurse, uint depth)
         {
             var nodeFactory = GetNodeFactoryFromPath(path, false);
             if (null == nodeFactory)
@@ -833,28 +850,36 @@ namespace CodeOwls.PowerShell.Provider
                 return;
             }
 
-            nodeFactory.ToList().ForEach(f => GetChildItems(path, f, recurse));
+            nodeFactory.ToList().ForEach(f => GetChildItems(path, f, recurse, depth));
+            FilterRegexMap.Clear();
         }
 
-        void GetChildItems(string path, IPathNode pathNode, bool recurse)
+        void GetChildItems(string path, IPathNode pathNode, bool recurse, uint depth)
         {
             var context = CreateContext(path, recurse );
             var children = pathNode.GetNodeChildren(context);
-            WriteChildItem(path, recurse, children);
+            WriteChildItem(path, recurse, depth, children);
         }
 
-        private void WriteChildItem(string path, bool recurse, IEnumerable<IPathNode> children)
+        private void WriteChildItem(string path, bool recurse, uint depth, IEnumerable<IPathNode> children)
         {
             if (null == children )
             {
                 return;
             }
 
+            var exit = false;
             children.ToList().ForEach(
                 f =>
                     {
                         try
                         {
+                            // Making sure to obey the StopProcessing
+                            if (Stopping || exit)
+                            {
+                                return;
+                            }
+
                             var i = f.GetNodeValue();
                             if (null == i)
                             {
@@ -864,18 +889,33 @@ namespace CodeOwls.PowerShell.Provider
                             WritePathNode(childPath, f);
                             if (recurse)
                             {
-                                var context = CreateContext(path, recurse);
-                                var kids = f.GetNodeChildren(context);
-                                WriteChildItem(childPath, recurse, kids);
+                                // Limiter for recursion. E.g., dir -depth 2
+                                if (depth > 0)
+                                {
+                                    var context = CreateContext(childPath, recurse);
+                                    var kids = f.GetNodeChildren(context);
+                                    WriteChildItem(childPath, recurse, depth - 1, kids);
+                                }
                             }
                         }
-                        catch (PipelineStoppedException)
+                        catch (PipelineStoppedException )
                         {
+                            // For a case like 'dir | select -First 3', we can get PipelineStoppedException 
+                            // from the PowerShell engine. That's ok because it just means that we're done.
+                            // Note that in a provider, by swallowing the PipelineStoppedException exception may
+                            // cause the PowerShell instance exit early without properly rendering outputs.
+                            // Also we should not call PowerShell APIs such as WriteError when receiving PipelineStoppedException.
+                            // This is because the PowerShell may throw a new PipelineStoppedException exception directly to a user.
+
+                            // Refer to https://msdn.microsoft.com/en-us/library/system.management.automation.pipelinestoppedexception(v=vs.85).aspx
+                            // cmdlets or providers ... allow this exception to propagate up, and the Windows PowerShell 
+                            // runtime will catch the exception.
+                            exit = true;
                             throw;
                         }
-                        catch( Exception e )
+                        catch (Exception e)
                         {
-                            WriteDebug("An exception was raised while writing child items to the pipeline: " + e.ToString());
+                            WriteWarning(e.Message);
                         }
                     });
         }
@@ -883,6 +923,11 @@ namespace CodeOwls.PowerShell.Provider
 
         private bool IsRootPath(string path)
         {
+            // 
+            // e.g., MyProvider\MyProvider::JT:\
+            // cd ..
+            //should return false if the path is null or empty
+            if (string.IsNullOrWhiteSpace(path))  { return false; }
             path = Regex.Replace(path.ToLower(), @"[a-z0-9_]+:[/\\]?", "");
             return String.IsNullOrEmpty(path);
         }
@@ -921,18 +966,27 @@ namespace CodeOwls.PowerShell.Provider
             nodeFactory.ToList().ForEach(f => GetChildNames(path, f, returnContainers));
         }
 
-        void GetChildNames( string path, IPathNode pathNode, ReturnContainers returnContainers )
+        void GetChildNames(string path, IPathNode pathNode, ReturnContainers returnContainers)
         {
-            pathNode.GetNodeChildren(CreateContext(path)).ToList().ForEach(
-                f =>
-                    {
-                        var i = f.GetNodeValue();
-                        if (null == i)
-                        {
-                            return;
-                        }
-                        WriteItemObject(i.Name, path + "\\" + i.Name, i.IsCollection);
-                    });
+            //removed ToList() so that it can be async. Therefore results can be shown up to a user sooner.
+            var pathNodes = pathNode.GetNodeChildren(CreateContext(path));
+            if (pathNodes == null) return;
+
+            GetChildNames(path, pathNodes);
+        }
+
+        protected void GetChildNames(string path, IEnumerable<IPathNode> pathNodes)
+        {
+            foreach (var node in pathNodes)
+            {
+                var i = node.GetNodeValue();
+                if (null == i)
+                {
+                    return;
+                }
+
+                WriteItemObject(i.Name, Path.Combine(path, i.Name), i.IsCollection);
+            }
         }
 
         protected override object GetChildNamesDynamicParameters(string path)
@@ -1083,7 +1137,8 @@ namespace CodeOwls.PowerShell.Provider
 
         private object DoNewItemDynamicParameters(string path)
         {
-            var factory = GetNodeFactoryFromPathOrParent(path).FirstOrDefault();
+            // Added conditional access because GetNodeFactoryFromPathOrParent() can be null
+            var factory = GetNodeFactoryFromPathOrParent(path)?.FirstOrDefault();
             var @new = factory as INewItem;
             if (null == factory || null == @new)
             {
@@ -1091,6 +1146,27 @@ namespace CodeOwls.PowerShell.Provider
             }
 
             return @new.NewItemParameters;
+        }
+
+        private static Regex GetRegexFromFilter(string filter)
+        {
+            //no -Filter is used
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                return null;
+            }
+            if (FilterRegexMap.ContainsKey(filter))
+            {
+                return FilterRegexMap[filter];
+            }
+
+            //Support '?' and '*', just like FileSystem provider or
+            //DirectoryInfo.EnumerateDirectories https://msdn.microsoft.com/en-us/library/dd383690(v=vs.110).aspx
+            var tempFilter = "^" + filter.Replace("*", ".*").Replace("?", ".?") + "$";
+            var tempRegex = new Regex(tempFilter, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            FilterRegexMap.Add(filter, tempRegex);
+
+            return tempRegex;
         }
 
         private void WritePathNode(string nodeContainerPath, IPathNode factory)
@@ -1103,9 +1179,15 @@ namespace CodeOwls.PowerShell.Provider
 
             //nodeContainerPath = SessionState.Path.GetUnresolvedProviderPathFromPSPath(nodeContainerPath);
 
+            Regex regex = GetRegexFromFilter(Filter);
+            if (regex != null && !regex.IsMatch(value.Name))
+            {
+                return;
+            }
             PSObject pso = PSObject.AsPSObject(value.Item);
             pso.Properties.Add(new PSNoteProperty(ItemModePropertyName, factory.ItemMode));
-            WriteItemObject(pso, nodeContainerPath, value.IsCollection);
+            // PowerShell issue? we need to trim backslash here to make get-item .\foo\ and get-item .\foo to work 
+            WriteItemObject(pso, nodeContainerPath?.TrimEnd('/', '\\'), value.IsCollection);
         }
 
         private void WritePathNode(string nodeContainerPath, IPathValue value)
@@ -1210,10 +1292,16 @@ namespace CodeOwls.PowerShell.Provider
             IEnumerable<IPathNode> factories = null;
             factories = ResolvePath(path);
 
-            if ( resolveFinalFilter && !String.IsNullOrEmpty(Filter))
-            {
-                factories = factories.First().Resolve(CreateContext(path), null);
-            }
+            // hmm... this does not look right to me by returning the First() only.
+            // For example, "dir -Filter si* -force " will not show the child items. Instead will show parent
+            // nodes for m times where m= number of child nodes.
+            // In addition, Resolve()/PathNodeBase.cs calls GetNodeChildren(). This can be expensive
+            // because getting child items again and again.
+            // Therefore moving Filter action to WritePathNode(). 
+            //if ( resolveFinalFilter && !String.IsNullOrEmpty(Filter))
+            //{
+            //    factories = factories.First().Resolve(CreateContext(path), null);
+            //}
 
             return factories;
         }
@@ -1543,9 +1631,34 @@ namespace CodeOwls.PowerShell.Provider
                 LogDebug(">> {0}([{1}])", methodName, argsList);
                 action();
             }
+            catch (PipelineStoppedException)
+            {
+                // For a case like 'dir | select -First 3', we can get PipelineStoppedException 
+                // from the PowerShell engine. That's ok because it just means that we're done.
+                // Note that in a provider, by swallowing the PipelineStoppedException exception may
+                // cause the PowerShell instance exit early without properly rendering outputs.
+                // Also we should not call PowerShell APIs such as WriteError when receiving PipelineStoppedException.
+                // This is because the PowerShell may throw a new PipelineStoppedException exception directly to a user.
+            
+                throw;
+            }
             catch (Exception e)
             {
                 LogDebug("!! {0}([{1}]) EXCEPTION: {2}", methodName, argsList, e.ToString());
+                if (e is System.Management.Automation.RuntimeException)
+                {
+                    var scritpStackTrace = (e as System.Management.Automation.RuntimeException).ErrorRecord.ScriptStackTrace;
+                    if (scritpStackTrace != null)
+                    {
+                        WriteWarning(scritpStackTrace);
+                    }
+                }
+                if (e.InnerException != null)
+                {
+                    WriteError(new ErrorRecord(e.InnerException, methodName, ErrorCategory.InvalidResult, this));
+                }
+                WriteError(new ErrorRecord(e, methodName, ErrorCategory.InvalidResult, this));
+
                 throw;
             }
             finally
@@ -1562,9 +1675,33 @@ namespace CodeOwls.PowerShell.Provider
                 LogDebug(">> {0}([{1}])", methodName, argsList);
                 return action();
             }
+            catch (PipelineStoppedException)
+            {
+                // For a case like 'dir | select -First 3', we can get PipelineStoppedException 
+                // from the PowerShell engine. That's ok because it just means that we're done.
+                // Note that in a provider, by swallowing the PipelineStoppedException exception may
+                // cause the PowerShell instance exit early without properly rendering outputs.
+                // Also we should not call PowerShell APIs such as WriteError when receiving PipelineStoppedException.
+                // This is because the PowerShell may throw a new PipelineStoppedException exception directly to a user.
+                throw;
+            }
             catch (Exception e)
             {
                 LogDebug("!! {0}([{1}]) EXCEPTION: {2}", methodName, argsList, e.ToString());
+
+                if (e is System.Management.Automation.RuntimeException)
+                {
+                    var scritpStackTrace = (e as System.Management.Automation.RuntimeException).ErrorRecord.ScriptStackTrace;
+                    if (scritpStackTrace != null)
+                    {
+                        WriteWarning(scritpStackTrace);
+                    }
+                }
+                if (e.InnerException != null)
+                {
+                    WriteError(new ErrorRecord(e.InnerException, methodName, ErrorCategory.InvalidResult, this));
+                }
+                WriteError(new ErrorRecord(e, methodName, ErrorCategory.InvalidResult, this));
                 throw;
             }
             finally

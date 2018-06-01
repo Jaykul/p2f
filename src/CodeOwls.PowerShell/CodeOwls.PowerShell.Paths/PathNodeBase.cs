@@ -36,11 +36,14 @@ namespace CodeOwls.PowerShell.Provider.PathNodes
         public virtual IEnumerable<IPathNode> Resolve(IProviderContext providerContext, string nodeName)
         {
             var children = GetNodeChildren( providerContext );
-            foreach (var child in children)
+            if (children != null)
             {
-                if (null == nodeName || StringComparer.InvariantCultureIgnoreCase.Equals(nodeName, child.Name))
+                foreach (var child in children)
                 {
-                    yield return child;
+                    if (null == nodeName || StringComparer.OrdinalIgnoreCase.Equals(nodeName, child.Name))
+                    {
+                        yield return child;
+                    }
                 }
             }
         }

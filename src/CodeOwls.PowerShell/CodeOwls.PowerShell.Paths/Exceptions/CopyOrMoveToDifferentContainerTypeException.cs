@@ -20,9 +20,11 @@
 	IN THE SOFTWARE. 
 */
 
-
 using System;
 using System.Runtime.Serialization;
+#if CORECLR
+using Microsoft.PowerShell.CoreClr.Stubs;
+#endif
 
 namespace CodeOwls.PowerShell.Paths.Exceptions
 {

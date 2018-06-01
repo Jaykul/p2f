@@ -251,5 +251,7 @@ namespace CodeOwls.PowerShell.Provider.PathNodeProcessors
         public Version PathTopologyVersion { get; set; }
 
         public string Path { get { return _path; } }
+
+        public CmdletProvider CmdletProvider { get { return _provider;} }
     }
 }

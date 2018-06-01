@@ -28,6 +28,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCompany("Code Owls LLC")]
 [assembly: AssemblyCopyright("Copyright © 2016 Code Owls LLC, All Rights Reserved")]
 
-[assembly: AssemblyDelaySign(false)]
-[assembly: AssemblyKeyFile("")]
-[assembly: AssemblyKeyName("")]
+//[assembly: AssemblyDelaySign(false)]
+//[assembly: AssemblyKeyFile("")]
+//[assembly: AssemblyKeyName("")]

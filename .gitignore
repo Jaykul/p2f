@@ -2,6 +2,7 @@
 syntax: glob
 *.suo
 *.user
+.vs/
 
 syntax: regexp
 _ReSharper.*

@@ -23,13 +23,18 @@
 
 
 
+
 using System;
+using System.Management.Automation;
+#if CORECLR
+using Microsoft.PowerShell.CoreClr.Stubs;
+#endif
 using System.Runtime.Serialization;
 
 namespace CodeOwls.PowerShell.Paths.Exceptions
 {
     [Serializable]
-    public class ProviderException : ApplicationException
+    public class ProviderException : RuntimeException
     {
         //
         // For guidelines regarding the creation of new exception types, see

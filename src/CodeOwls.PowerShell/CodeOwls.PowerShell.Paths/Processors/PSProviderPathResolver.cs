@@ -63,7 +63,7 @@ namespace CodeOwls.PowerShell.Paths.Processors
                     var id = matches.Captures[0].Value;
 
                     ActiveDrive =
-                        (T) _drives.First(d => StringComparer.InvariantCultureIgnoreCase.Equals(d.Root, id));
+                        (T) _drives.First(d => StringComparer.OrdinalIgnoreCase.Equals(d.Root, id));
                 }
             }
 

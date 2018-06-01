@@ -24,6 +24,7 @@
 using System;
 using System.Collections.Generic;
 using System.Management.Automation;
+using System.Management.Automation.Provider;
 using System.Security.AccessControl;
 using CodeOwls.PowerShell.Paths.Processors;
 using CodeOwls.PowerShell.Provider.PathNodes;
@@ -66,5 +67,7 @@ namespace CodeOwls.PowerShell.Provider.PathNodeProcessors
         object DynamicParameters { get; }
         Version PathTopologyVersion { get; }
         string Path { get; }
+
+        CmdletProvider CmdletProvider { get; }
     }
 }
