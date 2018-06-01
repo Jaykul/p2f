@@ -117,13 +117,13 @@ task __CreateLocalDataDirectory -description $private {
 
 task Build -depends __VerifyConfiguration -description "builds any outdated dependencies from source" {
 	exec {
-		msbuild $slnFile /p:Configuration=$config /p:KeyContainerName=$keyContainer /t:Build
+		msbuild $slnFile /p:Configuration=$config /p:KeyContainerName=$keyContainer /p:DefineConstants="PS5" /t:Build
 	}
 }
 
 task Clean -depends __VerifyConfiguration,CleanNuGet -description "deletes all temporary build artifacts" {
 	exec {
-		msbuild $slnFile /p:Configuration=$config /t:Clean
+		msbuild $slnFile /p:Configuration=$config /p:DefineConstants="PS5" /t:Clean
 	}
 }
 
