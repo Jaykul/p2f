@@ -20,6 +20,11 @@
 	IN THE SOFTWARE. 
 */
 
+// Transactions aren't really supported in PowerShell Core
+// nor are they enabled by default in the PowerShellStandard.Library
+// As such, I'm burying this under a flag -- Joel
+#if TRANSACTIONS
+
 using System.Management.Automation;
 
 namespace CodeOwls.PowerShell.Provider
@@ -360,3 +365,4 @@ namespace CodeOwls.PowerShell.Provider
         }
     }
 }
+#endif

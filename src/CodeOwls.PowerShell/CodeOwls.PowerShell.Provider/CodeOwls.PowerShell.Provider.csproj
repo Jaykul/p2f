@@ -4,9 +4,13 @@
     <RootNamespace>CodeOwls.PowerShell.Provider</RootNamespace>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\PowerShellStandard\src\5\System.Management.Automation-lib.csproj" />
+    <!-- Once the PowerShellStandard.Library releases a fix to theirs, we'll use that    
+       Until then, you need this on disk: https://github.com/Jaykul/PowerShellStandard -->
+    <!-- <PackageReference Include="PowerShellStandard.Library" Version="[3.0.0-preview-03,4.0.0)" /> -->
+    <ProjectReference Include="..\..\..\..\PowerShellStandard\src\3\System.Management.Automation-lib.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\CodeOwls.PowerShell.Paths\CodeOwls.PowerShell.Paths.csproj" />
   </ItemGroup>
 </Project>
