@@ -5,12 +5,20 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Once the PowerShellStandard.Library releases a fix to theirs, we'll use that    
-       Until then, you need this on disk: https://github.com/Jaykul/PowerShellStandard -->
-    <!-- <PackageReference Include="PowerShellStandard.Library" Version="[3.0.0-preview-03,4.0.0)" /> -->
-    <ProjectReference Include="..\..\..\..\PowerShellStandard\src\3\System.Management.Automation-lib.csproj" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\CodeOwls.PowerShell.Paths\CodeOwls.PowerShell.Paths.csproj" />
   </ItemGroup>
+
+  <Choose>
+    <When Condition="$(DefineConstants.Contains(PS3))">
+      <ItemGroup>
+        <!-- this is not be working -->
+        <PackageReference Include="PowerShellStandard.Library" Version="[3.0.0-preview-03,4.0.0)" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="PowerShellStandard.Library" Version="[5.1.0-preview-04,6.0.0)" />
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
 </Project>

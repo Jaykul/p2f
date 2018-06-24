@@ -836,10 +836,10 @@ namespace CodeOwls.PowerShell.Provider
             return ExecuteAndLog(() => true, "IsValidPath", path);
         }
 
-#if PS5
-        protected override void GetChildItems(string path, bool recurse, uint depth)
-#else
+#if PS3
         protected void GetChildItems(string path, bool recurse, uint depth)
+#else
+        protected override void GetChildItems(string path, bool recurse, uint depth)
 #endif
         {
             Action a= ()=>DoGetChildItems(path, recurse, depth);

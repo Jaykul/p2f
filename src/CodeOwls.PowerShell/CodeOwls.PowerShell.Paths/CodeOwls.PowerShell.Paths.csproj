@@ -12,26 +12,20 @@
     <!--<RuntimeIdentifiers>win7-x64;win81-x64;win10-x64</RuntimeIdentifiers>-->
     <!--<NetStandardImplicitPackageVersion>2.0.5</NetStandardImplicitPackageVersion>-->
   </PropertyGroup>
-
-
-  <!-- Once the PowerShellStandard.Library releases a fix to theirs, we'll use that    
-       Until then, you need this on disk: https://github.com/Jaykul/PowerShellStandard -->
+  <ItemGroup>
+    <PackageReference Include="System.Security.AccessControl" Version="4.5.0" />
+  </ItemGroup>
   <Choose>
-    <When Condition="$(DefineConstants.Contains(PS5))">
+    <When Condition="$(DefineConstants.Contains(PS3))">
       <ItemGroup>
-        <!-- <PackageReference Include="PowerShellStandard.Library" Version="[5.1.0-preview-03,6.0.0)" /> -->
-        <ProjectReference Include="..\..\..\..\PowerShellStandard\src\5\System.Management.Automation-lib.csproj" />
+        <!-- this is not be working -->
+        <PackageReference Include="PowerShellStandard.Library" Version="[3.0.0-preview-03,4.0.0)" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <!-- <PackageReference Include="PowerShellStandard.Library" Version="[3.0.0-preview-03,4.0.0)" /> -->
-        <ProjectReference Include="..\..\..\..\PowerShellStandard\src\3\System.Management.Automation-lib.csproj" />
+        <PackageReference Include="PowerShellStandard.Library" Version="[5.1.0-preview-04,6.0.0)" />
       </ItemGroup>
     </Otherwise>
   </Choose>
-
-  <ItemGroup>
-    <PackageReference Include="System.Security.AccessControl" Version="4.5.0" />
-  </ItemGroup>
 </Project>
