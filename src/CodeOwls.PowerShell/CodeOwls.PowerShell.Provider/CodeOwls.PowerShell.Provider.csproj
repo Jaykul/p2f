@@ -3,6 +3,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>CodeOwls.PowerShell.Provider</RootNamespace>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CodeOwls.PowerShell.Paths\CodeOwls.PowerShell.Paths.csproj" />
