@@ -20,9 +20,6 @@
 	IN THE SOFTWARE. 
 */
 
-
-
-
 namespace CodeOwls.PowerShell.Provider.PathNodes
 {
     public interface IPathValue

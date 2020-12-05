@@ -1,5 +1,5 @@
-﻿using System.Management.Automation.Provider;
-using CodeOwls.PowerShell.Provider.PathNodeProcessors;
+﻿using CodeOwls.PowerShell.Provider.PathNodeProcessors;
+using System.Management.Automation.Provider;
 
 namespace CodeOwls.PowerShell.Paths
 {

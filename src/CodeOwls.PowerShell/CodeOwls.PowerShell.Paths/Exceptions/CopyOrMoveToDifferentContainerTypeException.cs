@@ -40,7 +40,7 @@ namespace CodeOwls.PowerShell.Paths.Exceptions
         }
 
         public CopyOrMoveToDifferentContainerTypeException(string copy, string copyPath)
-            : base("The item at [" + copy + "] cannot be copied to the specified location ["+copyPath+"] because the destination contains different types of items.")
+            : base("The item at [" + copy + "] cannot be copied to the specified location [" + copyPath + "] because the destination contains different types of items.")
         {
         }
 

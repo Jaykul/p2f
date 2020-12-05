@@ -36,7 +36,7 @@ namespace CodeOwls.PowerShell.Paths.Exceptions
         //
 
         public CopyOrMoveToNonexistentContainerException()
-        {           
+        {
         }
 
         public CopyOrMoveToNonexistentContainerException(string copyPath)

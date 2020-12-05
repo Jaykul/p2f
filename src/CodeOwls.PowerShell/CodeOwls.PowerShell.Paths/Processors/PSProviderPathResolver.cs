@@ -20,13 +20,13 @@
 	IN THE SOFTWARE. 
 */
 
+using CodeOwls.PowerShell.Provider.PathNodeProcessors;
+using CodeOwls.PowerShell.Provider.PathNodes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
-using CodeOwls.PowerShell.Provider.PathNodeProcessors;
-using CodeOwls.PowerShell.Provider.PathNodes;
 
 namespace CodeOwls.PowerShell.Paths.Processors
 {
@@ -40,7 +40,7 @@ namespace CodeOwls.PowerShell.Paths.Processors
         private readonly IEnumerable<PSDriveInfo> _drives;
 
         public T ActiveDrive { get; private set; }
-        
+
         protected PSProviderPathResolver(IEnumerable<PSDriveInfo> drives)
         {
             if (null == drives)
@@ -53,7 +53,7 @@ namespace CodeOwls.PowerShell.Paths.Processors
 
         public override IEnumerable<IPathNode> ResolvePath(IProviderContext providerContext, string path)
         {
-            ActiveDrive = (T) _drives.First();
+            ActiveDrive = (T)_drives.First();
 
             if (_drives.Any())
             {
@@ -63,7 +63,7 @@ namespace CodeOwls.PowerShell.Paths.Processors
                     var id = matches.Captures[0].Value;
 
                     ActiveDrive =
-                        (T) _drives.First(d => StringComparer.OrdinalIgnoreCase.Equals(d.Root, id));
+                        (T)_drives.First(d => StringComparer.OrdinalIgnoreCase.Equals(d.Root, id));
                 }
             }
 
