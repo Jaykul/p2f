@@ -17,7 +17,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="PowerShellStandard.Library" Version="[5.1.0-preview-04,6.0.0)" />
+        <PackageReference Include="PowerShellStandard.Library" Version="5.1.0" />
       </ItemGroup>
     </Otherwise>
   </Choose>
